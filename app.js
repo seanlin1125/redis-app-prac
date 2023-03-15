@@ -1,14 +1,15 @@
 const path = require('path')
 const express = require('express')
-const handlebars = require('express-handlebars')
+const { engine } = require('express-handlebars')
 const methodOverride = require('method-override')
 const redis = require('redis')
 
-app.engine('hbs', handlebars({ extname: '.hbs', helpers: handlebarsHelpers }))
-app.set('view engine', 'hbs')
-
 const app = express()
 const port = 3000
+
+app.engine('.hbs', engine({ extname: '.hbs' }))
+app.set('view engine', '.hbs')
+app.set('views', './views')
 
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json())
