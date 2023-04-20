@@ -1,30 +1,39 @@
-const path = require('path')
 const express = require('express')
-const engine = require('express-handlebars')
+const exphbs = require('express-handlebars')
+const path = require('path')
+const bodyParser = require('body-parser')
 const methodOverride = require('method-override')
-const { createClient } = require('redis')
-const client = createClient({ host: '127.0.0.1', port: 6379 }) // default host and port
+const redis = require('redis')
 
-;(async () => {
-  client.on('connect', () => console.log('Redis connected!'))
+// Create Redis Client
+let client = redis.createClient()
 
-  client.on('error', (err) => console.error(err))
-  await client.connect()
-})()
+// 如果是windows, 先用wsl terminal輸入redis-server啟用redis，再run專案
+client.on('connect', function () {
+  console.log('Connected to Redis...')
+})
 
-const app = express()
+// Set Port
 const port = 3000
 
-app.engine('.hbs', engine({ defaultLayout: 'main', extname: '.hbs' }))
-app.set('view engine', '.hbs')
-app.set('views', './views')
+// Init app
+const app = express()
 
-app.use(express.urlencoded({ extended: false }))
-app.use(express.json())
+// View Engine
+app.engine('hbs', exphbs({ defaultLayout: 'main', extname: '.hbs' }))
+app.set('view engine', 'hbs')
+// app.engine('.hbs', engine({ defaultLayout: 'main', extname: '.hbs' }))
+// app.set('view engine', '.hbs')
 
+// body-parser
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }))
+
+// methodOverride
 app.use(methodOverride('_method'))
 
-app.get('/', (req, res, next) => {
+// Search Page
+app.get('/', function (req, res, next) {
   res.render('searchusers')
 })
 
@@ -32,10 +41,7 @@ app.get('/', (req, res, next) => {
 app.post('/user/search', function (req, res, next) {
   let id = req.body.id
 
-  client.hGetAll(id, function (err, obj) {
-    if (err) {
-      return next(err) // 錯誤處理
-    }
+  client.hgetall(id, function (err, obj) {
     if (!obj) {
       res.render('searchusers', {
         error: 'User does not exist',
@@ -53,11 +59,16 @@ app.post('/user/search', function (req, res, next) {
 app.get('/user/add', function (req, res, next) {
   res.render('adduser')
 })
+
 // Process Add User Page
 app.post('/user/add', function (req, res, next) {
-  const { id, first_name, last_name, email, phone } = req.body
+  let id = req.body.id
+  let first_name = req.body.first_name
+  let last_name = req.body.last_name
+  let email = req.body.email
+  let phone = req.body.phone
 
-  client.hSet(
+  client.hmset(
     id,
     [
       'first_name',
@@ -71,7 +82,7 @@ app.post('/user/add', function (req, res, next) {
     ],
     function (err, reply) {
       if (err) {
-        console.error(err)
+        console.log(err)
       }
       console.log(reply)
       res.redirect('/')
@@ -79,6 +90,12 @@ app.post('/user/add', function (req, res, next) {
   )
 })
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`)
+// Delete User
+app.delete('/user/delete/:id', function (req, res, next) {
+  client.del(req.params.id)
+  res.redirect('/')
+})
+
+app.listen(port, function () {
+  console.log('Server started on port ' + port)
 })
